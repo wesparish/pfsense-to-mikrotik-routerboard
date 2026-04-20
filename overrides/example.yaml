@@ -1,0 +1,72 @@
+# pfmk overrides — copy to overrides/<name>.yaml and edit.
+# Anything you set here takes precedence over what's parsed from the pfSense XML.
+# Secrets (VPN keys, DDNS API tokens) must come from env vars, never this file.
+
+target:
+  routeros_version: "7.13"
+  hostname: null             # unset → use <system><hostname> from XML
+  timezone: null             # unset → use <system><timezone> from XML
+
+# Interface map: pfSense short name → MikroTik assignment.
+# RB3011 has ether1..ether10. Convention here:
+#   ether1  = WAN (primary egress)
+#   ether2  = WAN2 (ingress for port forwards → K8s nginx-ingress)
+#   ether3..ether10 = LAN bridge members
+interfaces:
+  wan:  { target: ether1, role: egress }
+  opt1: { target: ether2, role: ingress }
+  lan:
+    target: bridge-lan
+    role: lan
+    members: [ether3, ether4, ether5, ether6, ether7, ether8, ether9, ether10]
+  opt2: { skip: true }       # pfSense WAN3 — retired
+  opt3: { skip: true }       # pfSense OpenVPN NordVPN client — replaced by WireGuard
+
+# NordVPN as a WireGuard client (NordLynx).
+# Keys and endpoints must be filled in before running the generator;
+# any blanks become <FILL_IN> placeholders in the generated .rsc.
+vpn:
+  nordvpn:
+    enabled: true
+    interface_name: wg-nordvpn
+    listen_port: 51820
+    address: ""                   # tunnel-local /32 NordVPN assigns you, e.g. 10.5.0.2/32
+    peer_pubkey: ""               # NordVPN server public key
+    endpoint_host: ""             # e.g. us1234.nordvpn.com (or its resolved IP)
+    endpoint_port: 51820
+    allowed_address: 0.0.0.0/0    # route all v4 into the tunnel (policy routed later)
+    persistent_keepalive: 25s
+
+# Policy routing.
+# default_via: "nordvpn" routes LAN traffic through the WireGuard tunnel by
+# default. Bypass lists are per egress WAN (matches pfSense's per-rule gateway):
+#   via_wan  — IPs that should go out the egress-role interface (WAN / ether1)
+#   via_wan2 — IPs that should go out the ingress-role interface (WAN2 / ether2)
+routing:
+  default_via: nordvpn
+  bypass:
+    via_wan: []
+    via_wan2: []
+
+# DNS domain filter. Entries whose host/domainoverride domain matches or is a
+# subdomain of anything in `drop` are omitted. `keep` is documentation only.
+domains:
+  keep: [elastiscale.net, weshouse]
+  drop:
+    - cowtownt.org           # domain no longer owned
+    - firstshotprecision.com # domain no longer owned
+    - jamiehouse             # remote site retired (was VPN)
+    - miners                 # remote site retired (was VPN)
+
+# (planned) Wholesale drops for sections we're retiring.
+drop_packages:
+  - snort
+  - squid
+  - squidguard
+  - clamav
+  - cicap
+  - lightsquid
+drop_vpn:
+  openvpn_servers: all
+  openvpn_clients: [NordVPN]
+  ipsec_mobile: true

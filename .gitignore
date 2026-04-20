@@ -1,0 +1,21 @@
+# Real pfSense exports contain PII (IPs, MACs, cert fingerprints, hashed creds).
+# Keep them local — the generator code is shareable, the inputs are not.
+pfsense-configs/*.xml
+!pfsense-configs/.gitkeep
+
+# Generator output (also contains PII)
+output/
+
+# Local override files with real secrets (keep overrides/example.yaml tracked)
+overrides/*.yaml
+!overrides/example.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build/
+dist/
