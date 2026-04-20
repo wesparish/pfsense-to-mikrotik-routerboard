@@ -1,7 +1,10 @@
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -138,7 +141,7 @@ def load_overrides(path: str | Path | None) -> Overrides:
         ),
     )
 
-    return Overrides(
+    overrides = Overrides(
         target=target,
         interfaces=interfaces,
         domains=domains,
@@ -146,3 +149,14 @@ def load_overrides(path: str | Path | None) -> Overrides:
         routing=routing,
         raw=data,
     )
+    logger.info(
+        "overrides: %d iface mapping(s), %d domain drop(s), nordvpn=%s, "
+        "default_via=%s, bypass via_wan=%d via_wan2=%d",
+        len(interfaces),
+        len(domains.drop),
+        "enabled" if nordvpn.enabled else "disabled",
+        routing.default_via,
+        len(routing.bypass.via_wan),
+        len(routing.bypass.via_wan2),
+    )
+    return overrides

@@ -60,6 +60,9 @@ poetry run pfmk generate \
     --overrides overrides/mysite.yaml \
     --out output/mikrotik.rsc
 
+# Add -v (or -vv) to see what's being parsed, translated, and skipped:
+#   poetry run pfmk -v generate …
+
 # 4. Read output/mikrotik.rsc end-to-end.
 #    Pay attention to:  # SKIPPED  # NOTE  <FILL_IN_*>
 

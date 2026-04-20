@@ -1,5 +1,6 @@
 import base64
 import ipaddress
+import logging
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -18,19 +19,53 @@ from pfmk.model import (
     System,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def parse_config(path: str | Path) -> PfSenseConfig:
     tree = ET.parse(Path(path))
     root = tree.getroot()
 
     system = _parse_system(root)
+    logger.info("system: hostname=%s domain=%s tz=%s", system.hostname, system.domain, system.timezone)
+
     interfaces = _parse_interfaces(root)
+    enabled = [i for i in interfaces if i.enabled]
+    logger.info(
+        "interfaces: %d total, %d enabled (%s)",
+        len(interfaces),
+        len(enabled),
+        ", ".join(i.name for i in enabled),
+    )
+
     scopes = _parse_dhcp_scopes(root)
+    total_leases = sum(len(s.static_leases) for s in scopes)
+    logger.info(
+        "dhcp: %d scope(s), %d static lease(s) with IP",
+        len(scopes),
+        total_leases,
+    )
+
     dns_hosts = _parse_dns_hosts(root)
     domain_overrides = _parse_domain_overrides(root)
+    logger.info(
+        "dns: %d static host(s), %d domain override(s)",
+        len(dns_hosts),
+        len(domain_overrides),
+    )
+
     filter_rules = _parse_filter_rules(root)
+    logger.info("filter: %d firewall rule(s)", len(filter_rules))
+
     port_forwards, outbound_nat = _parse_nat(root)
+    logger.info(
+        "nat: %d port forward(s), %d outbound rule(s)",
+        len(port_forwards),
+        len(outbound_nat),
+    )
+
     dyndns = _parse_dyndns(root)
+    logger.info("dyndns: %d entry/entries", len(dyndns))
 
     iface_by_name = {i.name: i for i in interfaces}
     for scope in scopes:
@@ -113,11 +148,12 @@ def _parse_dhcp_scopes(root: ET.Element) -> list[DhcpScope]:
         ]
 
         leases: list[StaticLease] = []
+        skipped_no_ip = 0
         for sm in child.findall("staticmap"):
             mac = _text(sm, "mac", default="")
             ip = _text(sm, "ipaddr", default="")
             if not mac or not ip:
-                # Skip MAC-only reservations; useless without a pinned IP.
+                skipped_no_ip += 1
                 continue
             leases.append(
                 StaticLease(
@@ -126,6 +162,12 @@ def _parse_dhcp_scopes(root: ET.Element) -> list[DhcpScope]:
                     hostname=_text(sm, "hostname", default=""),
                     description=_text(sm, "descr", default=""),
                 )
+            )
+        if skipped_no_ip:
+            logger.debug(
+                "dhcp scope '%s': skipped %d staticmap(s) without IP",
+                child.tag,
+                skipped_no_ip,
             )
 
         scopes.append(
