@@ -91,7 +91,6 @@ def _physical_logical(
 
     # Order: wan, opt1..5, lan, then any others.
     preferred = ["wan", "opt1", "opt2", "opt3", "opt4", "opt5", "lan"]
-    seen: set[str] = set()
     ordered = [n for n in preferred if n in overrides.interfaces]
     ordered.extend(n for n in overrides.interfaces if n not in preferred)
 
@@ -116,8 +115,6 @@ def _physical_logical(
             lines.append(
                 f"│   {target:<14} → {descr:<12} {mode}{role}"
             )
-
-        seen.add(name)
 
     # Skipped
     skipped = [n for n, m in overrides.interfaces.items() if m.skip]

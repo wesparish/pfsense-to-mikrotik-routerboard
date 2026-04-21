@@ -64,6 +64,48 @@ def test_scaffold_allocates_bridge_members_after_wan_ethers():
     assert members[-1] == "ether10"
 
 
+def test_scaffold_skips_non_ip_and_inverted_bypass_sources():
+    """Aliases/hostnames and inverted sources shouldn't land in bypass lists."""
+    from pfmk.model import Endpoint, FilterRule, PfSenseConfig, System
+
+    config = PfSenseConfig(
+        system=System(hostname="test", domain="local", timezone="UTC"),
+        filter_rules=[
+            # Alias name in the address slot — not a valid IP
+            FilterRule(
+                action="pass",
+                interface="lan",
+                direction="in",
+                ipprotocol="inet",
+                protocol=None,
+                source=Endpoint(any=False, address="my_alias_name"),
+                destination=Endpoint(any=True),
+                disabled=False,
+                description="alias-sourced rule",
+                tracker="1",
+                gateway="WAN_DHCP",
+            ),
+            # Inverted source — "everything except this IP"; not a bypass target
+            FilterRule(
+                action="pass",
+                interface="lan",
+                direction="in",
+                ipprotocol="inet",
+                protocol=None,
+                source=Endpoint(any=False, address="172.16.1.200", invert=True),
+                destination=Endpoint(any=True),
+                disabled=False,
+                description="inverted source",
+                tracker="2",
+                gateway="WAN2_DHCP",
+            ),
+        ],
+    )
+    rendered = scaffold_overrides(config, "synthetic")
+    assert "my_alias_name" not in rendered
+    assert "172.16.1.200" not in rendered
+
+
 def test_scaffold_extracts_bypass_ips_from_gateway_rules():
     # Build a synthetic fixture with gateway-pinned rules inline (minimal
     # fixture doesn't have any).

@@ -5,6 +5,7 @@ comments and TODO markers. It must also round-trip cleanly through
 pfmk.overrides.load_overrides — the tests verify this.
 """
 
+import ipaddress
 from datetime import datetime, timezone
 
 from pfmk.model import PfSenseConfig
@@ -232,11 +233,21 @@ def _bypass_ips_from_rules(
     for rule in config.filter_rules:
         if rule.disabled or not rule.gateway:
             continue
+        # Inverted sources ("match everything except this") are not bypass
+        # candidates — semantics flip if we scaffolded them.
+        if rule.source.invert:
+            continue
         src_ip = rule.source.address
         if not src_ip:
             continue
-        # Skip subnet sources like 172.16.1.0/24 — they're catch-alls, not hosts
+        # Skip subnet sources like 172.16.1.0/24 — they're catch-alls, not hosts.
         if "/" in src_ip:
+            continue
+        # Skip anything that isn't a valid IPv4 literal (aliases, hostnames,
+        # macros). Those can't be dropped straight into an address-list.
+        try:
+            ipaddress.IPv4Address(src_ip)
+        except (ipaddress.AddressValueError, ValueError):
             continue
 
         gw = rule.gateway.upper()
