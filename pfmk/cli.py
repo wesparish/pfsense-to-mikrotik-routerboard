@@ -60,6 +60,11 @@ def _generate(xml_path: str, overrides_path: str | None, out_path: str) -> int:
 
     logger.info("loading overrides: %s", overrides_path or "(none — using defaults)")
     overrides = load_overrides(overrides_path)
+    if overrides_path is None:
+        logger.warning(
+            "no --overrides file provided; interface mappings are empty — "
+            "most firewall/NAT rules will be skipped"
+        )
 
     logger.info("emitting RouterOS .rsc")
     rendered = emit_all(config, overrides, source_path=xml_path)

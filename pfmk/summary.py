@@ -20,6 +20,7 @@ def render_summary(
 ) -> str:
     sections = [
         _header(),
+        _warnings_block(config, overrides, rendered),
         _physical_logical(config, overrides),
         _lan_services(config, overrides),
         _egress_policy(config, overrides),
@@ -30,6 +31,38 @@ def render_summary(
         _action_items(config, overrides, rendered),
     ]
     return "\n".join(s for s in sections if s) + "\n"
+
+
+def _warnings_block(
+    config: PfSenseConfig, overrides: Overrides, rendered: str
+) -> str:
+    warnings: list[str] = []
+
+    if not overrides.interfaces:
+        warnings.append(
+            "No interface mappings configured (likely no --overrides file)."
+        )
+        skipped = sum(
+            1 for i in config.interfaces if i.enabled
+        )
+        affected_rules = len(config.filter_rules)
+        affected_nat = len(config.nat_port_forwards)
+        warnings.append(
+            f"  → {skipped} pfSense interface(s), {affected_rules} firewall "
+            f"rule(s), and {affected_nat} port forward(s) were skipped."
+        )
+        warnings.append(
+            "  → Start by copying overrides/example.yaml to "
+            "overrides/<yours>.yaml and passing --overrides."
+        )
+
+    if not warnings:
+        return ""
+
+    lines = ["│", "│ ⚠  WARNINGS"]
+    for w in warnings:
+        lines.append(f"│   {w}")
+    return "\n".join(lines)
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -49,6 +82,10 @@ def _physical_logical(
     config: PfSenseConfig, overrides: Overrides
 ) -> str:
     lines = ["│", "│ Physical → logical"]
+
+    if not overrides.interfaces:
+        lines.append("│   (none — pass --overrides to map pfSense interfaces to ether ports)")
+        return "\n".join(lines)
 
     iface_by_name = {i.name: i for i in config.interfaces}
 
@@ -127,6 +164,12 @@ def _egress_policy(config: PfSenseConfig, overrides: Overrides) -> str:
     ingress_iface = _role_target(overrides, "ingress")
 
     lines = ["│", "│ WAN egress policy"]
+
+    if not overrides.interfaces:
+        lines.append(
+            "│   (nothing to route — no interface mappings)"
+        )
+        return "\n".join(lines)
 
     if r.default_via == "nordvpn" and nv.enabled:
         lines.append(
@@ -257,6 +300,13 @@ def _action_items(
     config: PfSenseConfig, overrides: Overrides, rendered: str
 ) -> str:
     items: list[str] = []
+
+    # No mappings: this is the dominant issue — mention first and prominently.
+    if not overrides.interfaces:
+        items.append(
+            "Provide an overrides file (cp overrides/example.yaml overrides/<yours>.yaml, "
+            "edit, then re-run with --overrides)"
+        )
 
     # WireGuard placeholders
     if overrides.nordvpn.enabled:
