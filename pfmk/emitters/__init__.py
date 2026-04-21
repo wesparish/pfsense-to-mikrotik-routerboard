@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from pfmk.emitters import ddns as ddns_emitter
@@ -12,6 +13,8 @@ from pfmk.emitters import wireguard as wireguard_emitter
 from pfmk.model import PfSenseConfig
 from pfmk.overrides import Overrides
 
+logger = logging.getLogger(__name__)
+
 
 def emit_all(
     config: PfSenseConfig,
@@ -21,32 +24,65 @@ def emit_all(
     now: datetime | None = None,
 ) -> str:
     now = now or datetime.now(timezone.utc)
-    sections = [
-        _header(source_path, overrides, now),
-        system_emitter.emit(config.system, overrides.target),
-        interfaces_emitter.emit(config.interfaces, overrides.interfaces),
-        dhcp_emitter.emit(config.dhcp_scopes, overrides.interfaces),
-        dns_emitter.emit(config.dns_hosts, config.domain_overrides, overrides.domains),
-        wireguard_emitter.emit(overrides.nordvpn),
-        firewall_filter_emitter.emit(
-            config.filter_rules, config.interfaces, overrides.interfaces
+    sections: list[tuple[str, str]] = [
+        ("header", _header(source_path, overrides, now)),
+        ("system", system_emitter.emit(config.system, overrides.target)),
+        (
+            "interfaces",
+            interfaces_emitter.emit(config.interfaces, overrides.interfaces),
         ),
-        firewall_nat_emitter.emit(
-            config.nat_port_forwards,
-            config.nat_outbound,
-            config.interfaces,
-            overrides.interfaces,
-            overrides.nordvpn,
+        (
+            "dhcp",
+            dhcp_emitter.emit(config.dhcp_scopes, overrides.interfaces),
         ),
-        routing_emitter.emit(
-            overrides.routing,
-            overrides.nordvpn,
-            config.interfaces,
-            overrides.interfaces,
+        (
+            "dns",
+            dns_emitter.emit(
+                config.dns_hosts, config.domain_overrides, overrides.domains
+            ),
         ),
-        ddns_emitter.emit(config.dyndns, overrides.interfaces, overrides.domains),
+        ("wireguard", wireguard_emitter.emit(overrides.nordvpn)),
+        (
+            "firewall_filter",
+            firewall_filter_emitter.emit(
+                config.filter_rules, config.interfaces, overrides.interfaces
+            ),
+        ),
+        (
+            "firewall_nat",
+            firewall_nat_emitter.emit(
+                config.nat_port_forwards,
+                config.nat_outbound,
+                config.interfaces,
+                overrides.interfaces,
+                overrides.nordvpn,
+            ),
+        ),
+        (
+            "routing",
+            routing_emitter.emit(
+                overrides.routing,
+                overrides.nordvpn,
+                config.interfaces,
+                overrides.interfaces,
+            ),
+        ),
+        (
+            "ddns",
+            ddns_emitter.emit(
+                config.dyndns, overrides.interfaces, overrides.domains
+            ),
+        ),
     ]
-    return "\n\n".join(s.rstrip() for s in sections if s.strip()) + "\n"
+
+    for name, rendered in sections:
+        if not rendered.strip():
+            logger.info("section %s: skipped (nothing to emit)", name)
+            continue
+        line_count = rendered.count("\n") + 1
+        logger.info("section %s: %d line(s)", name, line_count)
+
+    return "\n\n".join(s.rstrip() for _, s in sections if s.strip()) + "\n"
 
 
 def _header(source_path: str, overrides: Overrides, now: datetime) -> str:

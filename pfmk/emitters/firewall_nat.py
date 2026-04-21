@@ -9,10 +9,13 @@ outbound entries as comments for review.
 """
 
 import ipaddress
+import logging
 
 from pfmk.emitters._common import escape, expand_protocol
 from pfmk.model import Interface, NatOutbound, NatPortForward
 from pfmk.overrides import InterfaceMapping, WireGuardNordVPN
+
+logger = logging.getLogger(__name__)
 
 
 def emit(
@@ -42,11 +45,23 @@ def emit(
                 f'comment="LAN → NordVPN tunnel"'
             )
 
+    translated = skipped = 0
     if port_forwards:
         lines.append("")
         lines.append("# --- Port forwards (dst-nat) ---")
         for pf in port_forwards:
-            lines.extend(_emit_port_forward(pf, mappings))
+            out = _emit_port_forward(pf, mappings)
+            lines.extend(out)
+            if any("# SKIPPED" in line for line in out):
+                skipped += 1
+            else:
+                translated += 1
+    logger.info(
+        "firewall_nat: %d port forward(s) translated, %d skipped; %d outbound rule(s) referenced",
+        translated,
+        skipped,
+        len(outbound),
+    )
 
     if outbound:
         lines.append("")

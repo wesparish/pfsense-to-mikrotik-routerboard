@@ -13,9 +13,13 @@ zone_id + record_id in the PUT path — those are NOT in pfSense, so each
 Cloudflare entry emits a stub with a one-time curl to fetch them.
 """
 
+import logging
+
 from pfmk.emitters._common import escape
 from pfmk.model import DynDnsEntry
 from pfmk.overrides import DomainsOverrides, InterfaceMapping
+
+logger = logging.getLogger(__name__)
 
 _SCHEDULE_INTERVAL = "5m"
 
@@ -30,6 +34,12 @@ def emit(
         for e in entries
         if e.enabled and not _dropped(e.domain, domains.drop)
     ]
+    filtered = len(entries) - len(active)
+    logger.info(
+        "ddns: %d active, %d filtered (disabled or dropped domain)",
+        len(active),
+        filtered,
+    )
     if not active:
         return ""
 

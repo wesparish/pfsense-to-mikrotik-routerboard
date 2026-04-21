@@ -39,22 +39,40 @@ If you need something in the "replace" column, budget for a separate box
 (mini PC, NUC, or small x86 VM) running the Linux equivalent. RouterOS is a
 router, not a Swiss Army knife.
 
-## Step 3 — Write `overrides/yours.yaml`
+## Step 3 — Scaffold `overrides/yours.yaml`
 
-Copy `overrides/example.yaml` and fill in:
+Run `init-overrides` to generate a starting overrides file from the backup:
 
-- `target.routeros_version` — usually `"7.13"` or whatever your RouterOS is
-- `interfaces.*` — map each pfSense interface to a MikroTik ether port,
-  plus a role: `egress`, `ingress`, `lan`
-- `interfaces.<name>.skip: true` — for retired pfSense interfaces
-- `domains.drop` — domains to strip from the generated DNS entries
-- `vpn.nordvpn.*` — WireGuard peer info (see
-  [obtaining NordVPN WireGuard credentials](#obtaining-nordvpn-wireguard-credentials))
-- `routing.default_via` — `nordvpn` (policy-routed) or `wan`
-- `routing.bypass.via_wan` / `via_wan2` — LAN IPs that should skip the VPN
+```bash
+poetry run pfmk init-overrides path/to/config.xml
+```
+
+It writes `overrides/<hostname>.yaml` with:
+
+- `interfaces.*` pre-populated based on pfSense's interface list (first
+  DHCP WAN → ether1/egress, second → ether2/ingress, LAN → bridge-lan
+  with the remaining ethers as members, pseudo-interfaces skipped)
+- `routing.bypass.via_wan` / `via_wan2` populated from pfSense rules
+  that had an explicit `<gateway>` — those are your current policy-routed
+  hosts, grouped by which WAN they bypass to
+- `target.routeros_version` set to a reasonable default
+- `vpn.nordvpn.*` scaffolded with `<FILL_IN>`-style TODO placeholders
+- `domains.keep/drop` with `keep` prefilled from the pfSense domain and
+  `drop` empty (you fill in)
+
+Open the file and search for `TODO`. You'll almost always need to:
+
+- Fill in `vpn.nordvpn.{address, peer_pubkey, endpoint_host}` — see
+  [obtaining NordVPN WireGuard credentials](#obtaining-nordvpn-wireguard-credentials)
+- Add retired domains to `domains.drop`
+- Review the scaffolded interface guesses against your actual wiring
+- Toggle `skip: true` on any interface the scaffold left as active that you'd
+  rather retire, or vice versa
 
 `overrides/*.yaml` is gitignored (except `example.yaml`), so you can keep
-personal IPs and non-secret config in your fork.
+personal IPs and non-secret config in your fork. If you'd rather start from
+scratch than edit the scaffold, copy `overrides/example.yaml` and fill in by
+hand.
 
 ## Step 4 — Generate and review
 

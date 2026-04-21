@@ -19,8 +19,12 @@ especially for rules that were about reaching the pfSense web UI or SSH — thos
 now belong in `chain=input`, not `chain=forward`.
 """
 
+import logging
+
 from pfmk.model import Endpoint, FilterRule, Interface
 from pfmk.overrides import InterfaceMapping
+
+logger = logging.getLogger(__name__)
 
 # pfSense network references that mean "the router itself" — these belong in
 # chain=input, not chain=forward. `(self)` is explicit; `<iface>ip` means the
@@ -65,8 +69,27 @@ def emit(
 
     iface_nets = _interface_network_map(interfaces)
 
+    stats = {"translated": 0, "skipped": 0, "input_chain": 0, "ipv6": 0}
     for rule in rules:
-        lines.extend(_translate_rule(rule, interface_mappings, iface_nets))
+        out = _translate_rule(rule, interface_mappings, iface_nets)
+        lines.extend(out)
+        joined = "\n".join(out)
+        if "# SKIPPED (IPv6" in joined:
+            stats["ipv6"] += 1
+            stats["skipped"] += 1
+        elif "# SKIPPED" in joined:
+            stats["skipped"] += 1
+        else:
+            stats["translated"] += 1
+            if "chain=input" in joined:
+                stats["input_chain"] += 1
+    logger.info(
+        "firewall_filter: %d translated (%d to chain=input), %d skipped (%d IPv6)",
+        stats["translated"],
+        stats["input_chain"],
+        stats["skipped"],
+        stats["ipv6"],
+    )
 
     return "\n".join(lines).rstrip()
 
