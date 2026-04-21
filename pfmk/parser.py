@@ -243,6 +243,7 @@ def _parse_filter_rules(root: ET.Element) -> list[FilterRule]:
                 disabled=r.find("disabled") is not None,
                 description=_text(r, "descr", default=""),
                 tracker=_text(r, "tracker", default=""),
+                gateway=_text(r, "gateway", default=""),
             )
         )
     return rules

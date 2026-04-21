@@ -84,6 +84,7 @@ class FilterRule:
     disabled: bool
     description: str
     tracker: str
+    gateway: str = ""                    # pfSense gateway name if rule policy-routed
 
 
 @dataclass

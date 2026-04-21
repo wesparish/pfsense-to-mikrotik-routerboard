@@ -51,27 +51,49 @@ works too; you'll just manage the venv yourself.
 # 1. Drop your pfSense XML backup into pfsense-configs/ (gitignored).
 #    File can be named anything, e.g. config-pfsense.home-20260420.xml
 
-# 2. Copy the example overrides and edit:
-cp overrides/example.yaml overrides/mysite.yaml
+# 2. Scaffold an overrides YAML from the backup:
+poetry run pfmk init-overrides pfsense-configs/config-<name>.xml
 
-# 3. Generate:
+# This writes overrides/<hostname>.yaml with:
+#   - interface → ether guesses filled in
+#   - bypass IPs extracted from pfSense gateway-pinned rules
+#   - TODO markers where your input is required (NordVPN creds, etc.)
+
+# 3. Open overrides/<hostname>.yaml, search for TODO, and fill in.
+
+# 4. Generate:
 poetry run pfmk generate \
     pfsense-configs/config-<name>.xml \
-    --overrides overrides/mysite.yaml \
+    --overrides overrides/<hostname>.yaml \
     --out output/mikrotik.rsc
 
 # Add -v (or -vv) to see what's being parsed, translated, and skipped:
 #   poetry run pfmk -v generate …
 
-# 4. Read output/mikrotik.rsc end-to-end.
+# 5. Read output/mikrotik.rsc end-to-end.
 #    Pay attention to:  # SKIPPED  # NOTE  <FILL_IN_*>
 
-# 5. On the MikroTik:
+# 6. On the MikroTik:
 #    /import file-name=mikrotik.rsc verbose=yes
 ```
 
 `poetry shell` drops you in the venv if you'd rather run `pfmk` and `pytest`
 directly.
+
+### Why two files
+
+The **pfSense XML** is a snapshot of a running system — 100 firewall rules,
+29 DHCP leases, 19 DNS entries, interface definitions using pfSense's
+vocabulary (`wan`, `opt1`, `vtnet0`).
+
+The **overrides YAML** is a design doc for the new system — physical port
+assignments on this specific MikroTik (`opt1 → ether2`), semantic roles
+(`WAN2 is ingress for K8s`), bridge membership, what to drop, the
+WireGuard reshape. None of this can live in the backup.
+
+`pfmk init-overrides` reads the XML and fills in everything it *can*
+derive, with clearly-marked TODOs for the rest. See
+[docs/migration-guide.md](docs/migration-guide.md) for the full flow.
 
 ## Tests
 
