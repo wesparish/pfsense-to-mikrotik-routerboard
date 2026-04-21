@@ -5,6 +5,7 @@ from pathlib import Path
 from pfmk.emitters import emit_all
 from pfmk.overrides import load_overrides
 from pfmk.parser import parse_config
+from pfmk.summary import render_summary
 
 logger = logging.getLogger("pfmk")
 
@@ -68,4 +69,5 @@ def _generate(xml_path: str, overrides_path: str | None, out_path: str) -> int:
     out.write_text(rendered)
     logger.info("wrote %s (%d bytes)", out, len(rendered))
     print(f"wrote {out} ({len(rendered)} bytes)")
+    print(render_summary(config, overrides, rendered), end="")
     return 0
