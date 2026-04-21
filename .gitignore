@@ -19,3 +19,10 @@ __pycache__/
 venv/
 build/
 dist/
+
+# Editor swap / backup files
+*.swp
+*.swo
+.*.swp
+.*.swo
+*~
