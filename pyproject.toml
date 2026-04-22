@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pfmk"
-version = "0.1.0"
+version = "1.0.0"
 description = "Generate MikroTik RouterOS .rsc scripts from pfSense XML backups"
 authors = ["pfmk contributors"]
 readme = "README.md"
